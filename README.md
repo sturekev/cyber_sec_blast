@@ -143,6 +143,6 @@ complete and verify those entries before final academic submission.
 
 ### Links
 
-- **GitHub repository:** [Add repository URL]
-- **LinkedIn post:** [Add LinkedIn post URL]
-- **Research poster:** [Add poster URL or repository path]
+- **GitHub repository:** [repository URL](http://github.com/sturekev/cyber_sec_blast)
+- **LinkedIn post:** [LinkedIn post URL](https://lnkd.in/p/gB7r9BAk)
+- **Youtube video:** [Video](https://youtu.be/bx6_IJhoCcw)

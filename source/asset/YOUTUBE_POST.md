@@ -24,9 +24,9 @@ for selected high-value links.
 
 ### Links
 
-- **GitHub repository:** [Add repository URL]
-- **LinkedIn post:** [Add LinkedIn post URL]
-- **Research poster:** [Add poster URL or repository path]
+- **GitHub repository:** [repository URL](http://github.com/sturekev/cyber_sec_blast)
+- **LinkedIn post:** [LinkedIn post URL]
+- **Youtube video:** [Video](https://youtu.be/bx6_IJhoCcw)
 
 ### References
 
