@@ -1,0 +1,9 @@
+Hi, hello everyone. My name is Phat Tu. I'm from Concordia University in Chicago. I'm
+doing my master degree in computer science. So today I will just a quick mention
+about my own research in network security. It's mostly about the applying
+quantum, this quantum in network security. What I have so far is using the
+quantum key distribution and quantum key distribution as to later applying in
+the network system and converting between the classical network and in the
+future quantum network and using the hybrid quantum security is most
+benefit in this research and which in order to apply the applied network in
+preventing the concept of Harris later. Thank you.

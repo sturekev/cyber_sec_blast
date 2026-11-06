@@ -1,0 +1,1002 @@
+================================================================================
+BLAST RESEARCH POSTER — FULL CONTENT PACKAGE
+Topic: Quantum Key Distribution (QKD) and the Post-Quantum ("Post-QKD")
+       Secure Networking Stack
+Format: Plain-text master copy for poster layout + abstract preparation
+Generated: 2026-10-27
+================================================================================
+
+--------------------------------------------------------------------------------
+[ FIELDS YOU MUST COMPLETE BEFORE SUBMISSION — marked <<FILL>> ]
+--------------------------------------------------------------------------------
+Faculty Sponsor name .......... <<FILL>>
+Course number/section ......... <<FILL — e.g., CN1 / CIS-xxx, Section xx>>
+Semester ...................... <<FILL — e.g., Fall 2026>>
+Institution ................... <<FILL>>
+GitHub repository URL ......... <<FILL>>  (+ QR code on poster)
+YouTube BLAST URL ............. <<FILL>>  (+ QR code if applicable)
+LinkedIn post URL ............. <<FILL if required>>
+--------------------------------------------------------------------------------
+
+
+================================================================================
+1. TITLE & IDENTIFICATION
+================================================================================
+
+TITLE (primary):
+"Keys Without Trust Assumptions: Integrating Quantum Key Distribution and
+ Post-Quantum Cryptography into the Internet Protocol Stack"
+
+SUBTITLE:
+"A CN1 analysis of the QKD control/data plane, the ETSI key-delivery API, and
+ hybrid IKEv2 key establishment for quantum-era networks"
+
+ALTERNATE SHORTER TITLE (if poster header space is tight):
+"QKD + PQC: Rebuilding Key Exchange for the Quantum Era"
+
+Author ............ Truong Phat Tu
+Course ............ Computer Networks I (CN1) — <<FILL course number/section>>
+Semester .......... <<FILL>>
+Faculty Sponsor ... <<FILL>>
+Institution ....... <<FILL>>
+Track ............. Emerging Networking Technology / Network Security
+Hashtag ........... #WGP  —  "From Learning to Building — From Building to
+                    Innovation."
+
+
+================================================================================
+2. NETWORKING PROBLEM / MOTIVATION
+================================================================================
+
+THE PROBLEM IN ONE SENTENCE:
+Every secure session on today's Internet — TLS, IPsec/IKEv2, SSH, VPN tunnels —
+depends on a key-exchange step whose security rests on mathematical problems
+(integer factorization, discrete logarithm, elliptic-curve discrete logarithm)
+that a sufficiently large fault-tolerant quantum computer is expected to solve
+efficiently. If that assumption breaks, the confidentiality layer of the entire
+network stack breaks with it.
+
+WHY THIS IS A *NETWORKING* PROBLEM, NOT JUST A MATH PROBLEM:
+
+  (a) HARVEST-NOW / DECRYPT-LATER.
+      An adversary with passive tap access to a fiber link, an IXP, or a
+      submarine cable can record ciphertext today and store it. The data is
+      decrypted years later, once quantum capability arrives. The threat is
+      therefore ALREADY ACTIVE for any traffic with a long confidentiality
+      lifetime (medical records, financial settlement, national infrastructure
+      telemetry, legal archives). Network operators cannot wait for the
+      cryptographically relevant quantum computer to appear before responding.
+
+  (b) KEY ESTABLISHMENT IS A PROTOCOL PROBLEM.
+      Replacing a cipher is a local change. Replacing a key-exchange is a
+      change to the handshake — it alters message sizes, round-trip counts,
+      MTU/fragmentation behavior, handshake latency, state machines, and
+      middlebox compatibility. These are core CN1 concerns.
+
+  (c) THE REPLACEMENT CANDIDATES HAVE DIFFERENT FAILURE MODES.
+      - Post-Quantum Cryptography (PQC) keeps the existing network model but
+        swaps in new hard problems (lattices, hashes, codes). Risk: the new
+        math is young and could be broken by classical cryptanalysis.
+      - Quantum Key Distribution (QKD) derives keys from measurement
+        statistics on a physical quantum channel, so its secrecy argument is
+        information-theoretic. Risk: it needs new hardware, new links, trusted
+        relay nodes, and it does not scale like IP.
+      Neither alone is a drop-in answer. The real engineering question — and
+      the question this poster investigates — is how the two are COMBINED and
+      where each one attaches to the protocol stack.
+
+MOTIVATING QUESTION DRIVING THE RESEARCH:
+  "If an organization deploys QKD hardware, how does a quantum-derived key
+   actually reach an application, an IPsec tunnel, or a router line card —
+   and what does that cost in latency, throughput, topology, and trust?"
+
+
+================================================================================
+3. BACKGROUND — MINIMUM CONCEPTS A READER NEEDS
+================================================================================
+
+B1. SYMMETRIC VS. ASYMMETRIC KEYING
+    Bulk encryption (AES-256) is symmetric and is NOT considered broken by
+    quantum computing in the same catastrophic way; the practical concern is
+    the asymmetric key-AGREEMENT step that bootstraps the symmetric key.
+    Conclusion: fix the key agreement, keep the bulk cipher.
+
+B2. QUBITS AND THE PHYSICAL FACTS QKD EXPLOITS
+    - A qubit is a two-level quantum system; its state can be a superposition
+      of the computational basis states.
+    - MEASUREMENT DISTURBS. Measuring in the wrong basis randomizes the
+      outcome and leaves a statistical footprint.
+    - NO-CLONING THEOREM. An unknown quantum state cannot be copied exactly.
+      An eavesdropper therefore cannot make a perfect copy of the transmitted
+      photons, keep one, and forward the other untouched.
+    These two facts mean that eavesdropping on the quantum channel PRODUCES
+    DETECTABLE ERRORS. Secrecy becomes a measurable channel property rather
+    than a computational assumption.
+
+B3. QBER (QUANTUM BIT ERROR RATE)
+    The fraction of disagreeing bits in the sifted key. QBER is the control
+    signal of the whole system: it bounds how much information an eavesdropper
+    could hold and therefore determines how much key survives privacy
+    amplification. If QBER exceeds the protocol's security threshold, the
+    system produces NO key and the session aborts. For BB84 against general
+    attacks the commonly cited tolerable threshold is on the order of ~11%
+    (one-way reconciliation, asymptotic regime) [17], [21].
+
+B4. THE TWO CHANNELS (critical and often missed)
+    QKD always requires BOTH:
+      - a QUANTUM channel (dark fiber or free-space/satellite optical path)
+        carrying weak optical pulses; and
+      - a CLASSICAL, PUBLIC BUT AUTHENTICATED channel carrying the sifting,
+        reconciliation, and parameter-estimation messages.
+    The classical channel does not need confidentiality, but it absolutely
+    needs AUTHENTICATION — otherwise a man-in-the-middle simply impersonates
+    both endpoints. This is the single most important architectural
+    dependency in the entire technology.
+
+B5. POST-QUANTUM CRYPTOGRAPHY (PQC)
+    Classical algorithms believed hard for quantum computers. NIST
+    standardized ML-KEM (key encapsulation, FIPS 203), ML-DSA (signatures,
+    FIPS 204), and SLH-DSA (stateless hash-based signatures, FIPS 205) in
+    August 2024 [7], [8]. PQC runs on ordinary CPUs over ordinary IP — no new
+    physical layer required.
+
+B6. "POST-QKD" / HYBRID AS USED IN THIS POSTER
+    In this work "post-QKD" denotes the integrated architecture that emerged
+    after standalone QKD proved insufficient on its own: QKD supplying
+    information-theoretic key material on specific high-value links, PQC
+    supplying scalable authentication and a second independent key-agreement
+    path, and the final session key derived from BOTH so that the system stays
+    secure if EITHER component fails. The attached reference literature
+    explicitly identifies hybrid QKD+PQC as the practical near-term path and
+    rates the authentication gap as a MEDIUM-severity challenge resolvable in
+    the short term (1–3 years) through hybrid solutions [3].
+
+
+================================================================================
+4. CONNECTION TO CN1 CONCEPTS
+================================================================================
+
+This section is the graded core of the poster — each mapping must be explicit.
+
+CN1 CONCEPT      | HOW QKD / POST-QKD TOUCHES IT
+-----------------|--------------------------------------------------------------
+PROTOCOL         | QKD is not one protocol but a protocol SUITE with distinct
+ LAYERING &      | phases: quantum transmission -> sifting -> error
+ STATE MACHINES  | reconciliation -> parameter estimation -> privacy
+                 | amplification -> authenticated confirmation. Each phase is a
+                 | message exchange with its own state machine, exactly like a
+                 | handshake. The output is then consumed by a SEPARATE
+                 | delivery protocol (ETSI REST API) and a SEPARATE session
+                 | protocol (IKEv2/TLS).
+-----------------|--------------------------------------------------------------
+ENCAPSULATION    | A QKD-derived key is never "sent." It is generated
+                 | identically at both ends and then REFERENCED by an opaque
+                 | key_ID. The key_ID travels inside normal HTTP/JSON, inside
+                 | TLS, inside TCP, inside IP — a textbook encapsulation chain
+                 | layered on top of a non-IP physical process [4].
+-----------------|--------------------------------------------------------------
+SECURITY         | Shifts the trust model from COMPUTATIONAL security
+ ARCHITECTURE    | ("assumed hard to compute") to INFORMATION-THEORETIC
+                 | security ("provably no information leaked, given device
+                 | assumptions"), but introduces a new trust object: the
+                 | TRUSTED RELAY NODE, which holds plaintext key during XOR
+                 | relay. Trust is not eliminated — it is RELOCATED from math
+                 | to hardware and facility security.
+-----------------|--------------------------------------------------------------
+THROUGHPUT       | Secret-key rate (bits/s) is the binding constraint and it
+                 | falls steeply with fiber loss/distance. This forces a design
+                 | decision familiar from CN1: you cannot one-time-pad a
+                 | 100 Gb/s link with a kb/s key source, so the quantum key is
+                 | used to SEED/REKEY a symmetric cipher (AES-256) rather than
+                 | to encrypt bit-for-bit. Key rate becomes a rekey-interval
+                 | budget, not a line rate.
+-----------------|--------------------------------------------------------------
+DELAY &          | Reconciliation and privacy amplification add processing and
+ LATENCY         | propagation delay between raw detection and usable key. The
+                 | application-visible mitigation is BUFFERING keys in advance,
+                 | which converts a latency problem into a storage/queuing
+                 | problem.
+-----------------|--------------------------------------------------------------
+QUEUING &        | KMEs maintain key POOLS. A pool is a queue with an arrival
+ BUFFERING       | process (key generation rate) and a service process
+                 | (application key requests). Pool exhaustion = key starvation
+                 | = the secure tunnel must either stall, fall back to PQC, or
+                 | extend its rekey interval. This is classic producer/consumer
+                 | queue analysis applied to cryptographic material.
+-----------------|--------------------------------------------------------------
+PACKET LOSS /    | On the quantum channel, "loss" is photon loss, and it is
+ ERROR CONTROL   | NORMAL (most pulses never arrive). The sifting step is
+                 | conceptually a selective-acknowledgment pass: only detected,
+                 | basis-matched events are retained. Error reconciliation
+                 | (e.g., low-density parity-check based) is forward error
+                 | correction applied to a key instead of a payload. The
+                 | literature notes that modern low-leakage reconciliation
+                 | codes perform well, rating extraction efficiency a LOW
+                 | severity issue with a 1–2 year resolution horizon [3].
+-----------------|--------------------------------------------------------------
+CONGESTION &     | A single QKD link can only feed so many Security Application
+ ADMISSION       | Entities (SAEs). Multi-SAE key delivery requires admission
+ CONTROL         | control and fair allocation from the pool — ETSI documents
+                 | an informative model for delivering keys to multiple SAEs
+                 | [4]. Over-subscription of a key pool behaves like
+                 | congestion: requests must be shaped, prioritized, or denied
+                 | (HTTP 503 from the KME).
+-----------------|--------------------------------------------------------------
+ROUTING &        | Quantum states cannot be stored or regenerated by classical
+ TOPOLOGY        | routers, so there is NO store-and-forward routing of qubits
+                 | today. Reach is extended by (i) trusted-node chains that
+                 | hop-by-hop XOR keys, (ii) optical switching of the quantum
+                 | channel, or (iii) satellites as mobile relays. Path
+                 | selection becomes a TRUST-aware routing problem: the metric
+                 | is not just distance/cost but how many trusted nodes the key
+                 | traverses.
+-----------------|--------------------------------------------------------------
+NETWORK          | Clean three-plane separation: QUANTUM plane (photons) /
+ ARCHITECTURE    | KEY-MANAGEMENT plane (KME control, ETSI API) / DATA plane
+                 | (ordinary encrypted IP traffic). This is a direct analogue
+                 | of control-plane vs. data-plane separation taught in CN1 and
+                 | reused in SDN.
+
+
+================================================================================
+5. EMERGING TECHNOLOGY — WHAT IT IS AND WHERE IT FITS
+================================================================================
+
+WHAT IT IS:
+QKD is a method for two endpoints to generate a SHARED, SYMMETRIC, UNIFORMLY
+RANDOM bit string whose secrecy is guaranteed by the laws of quantum mechanics
+plus a security proof, rather than by computational hardness. The canonical
+prepare-and-measure protocol is BB84 [1]; the canonical entanglement-based
+protocol is E91, which grounds security in violation of Bell's inequality [2].
+
+WHAT IT IS NOT (important for the "not a collection of definitions" standard):
+  - It is NOT an encryption algorithm. It produces keys; AES still encrypts.
+  - It does NOT provide authentication by itself. It CONSUMES an initial
+    authentication secret and must be bootstrapped by something else
+    (pre-shared key, PQC signature, or PKI).
+  - It is NOT a replacement for the Internet. It is an overlay that feeds
+    key material into existing protocols.
+
+WHERE IT FITS IN COMPUTER NETWORKING:
+QKD occupies a NEW, PARALLEL PLANE beneath and beside the conventional stack:
+
+   * The quantum channel sits at/below Layer 1 — it is a physical-layer
+     facility (dark fiber, DWDM channel, or free-space optical path).
+   * The key-management layer (KME) is a control-plane service reachable over
+     ordinary IP, exposing a REST interface to applications [4].
+   * The consumption point is at Layer 3 (IPsec/IKEv2), Layer 2 (optical/
+     Ethernet link encryptors), or Layer 4/7 (TLS, application KMS).
+
+So the correct mental model is: QKD is a KEY SOURCE attached to the control
+plane, not a data-carrying network technology.
+
+WHERE PQC FITS:
+PQC fits entirely INSIDE existing protocols — ML-KEM in the TLS 1.3 or IKEv2
+key exchange, ML-DSA in certificates. It requires no new physical layer, which
+is precisely why the hybrid architecture is attractive: PQC gives global reach
+and authentication; QKD gives information-theoretic key material on the links
+where it is physically available.
+
+
+================================================================================
+6. HOW IT WORKS — MECHANISM AND WORKFLOW
+================================================================================
+
+PHASE 0 — BOOTSTRAP AUTHENTICATION (prerequisite)
+  Alice and Bob must already share an authentication secret, or must
+  authenticate using PQC signatures. Without this, QKD is vulnerable to a
+  man-in-the-middle on the classical channel. The reviewed literature
+  identifies this authentication dependency as a MEDIUM-severity open
+  challenge and points to hybrid QKD+PQC (e.g., lattice-based algorithms) as
+  the practical answer, with quantum digital signatures (QDS) as a longer-term
+  5–10 year option [3].
+
+PHASE 1 — QUANTUM TRANSMISSION
+  Alice encodes random bits onto single-photon-level pulses using randomly
+  chosen bases (e.g., rectilinear or diagonal polarization). Bob measures each
+  arriving pulse in an independently chosen random basis. Most pulses are lost
+  in fiber; only detected events matter.
+
+PHASE 2 — SIFTING
+  Over the authenticated CLASSICAL channel, Alice and Bob disclose WHICH BASIS
+  they used — never the bit values. Events where bases disagree are discarded.
+  Roughly half survive. Result: the SIFTED KEY.
+  >> CN1 analogy: a selective-ACK / negotiation pass over a lossy channel.
+
+PHASE 3 — PARAMETER ESTIMATION
+  A random subset of the sifted key is publicly compared and then destroyed.
+  This measures QBER. QBER is the eavesdropping detector: excess error implies
+  either a noisy channel or an interceptor, and the protocol must treat both
+  identically (conservatively).
+
+PHASE 4 — ERROR RECONCILIATION
+  The remaining bits still mismatch at the QBER rate. Interactive error
+  correction (modern implementations use low-leakage LDPC-style codes) makes
+  the two strings identical. The parity information exchanged is public, so
+  the leakage is accounted for in the next step.
+
+PHASE 5 — PRIVACY AMPLIFICATION
+  Alice and Bob apply a shared (randomly selected, publicly agreed) universal
+  hash function to compress the reconciled string into a shorter FINAL KEY.
+  The compression ratio is chosen so that the eavesdropper's expected
+  information about the final key is negligible. This step is what converts
+  "partially secret" into "secret."
+
+PHASE 6 — KEY CONFIRMATION & STORAGE
+  Both sides verify agreement with an authenticated tag, then write the key
+  into the Key Management Entity's pool, indexed by a key_ID.
+
+PHASE 7 — KEY DELIVERY TO APPLICATIONS (the networking step)
+  This is where QKD stops being physics and becomes a network service.
+  ETSI GS QKD 014 defines a REST-based key delivery API over HTTPS between a
+  Secure Application Entity (SAE) and its local Key Management Entity (KME)
+  [4]. The model is master-SAE / slave-SAE:
+
+     GET  https://{KME_hostname}/api/v1/keys/{slave_SAE_ID}/status
+          -> returns a Status object describing available key material.
+     GET/POST .../keys/{slave_SAE_ID}/enc_keys
+          -> master SAE obtains keys + key_IDs.
+     POST .../keys/{master_SAE_ID}/dec_keys
+          -> slave SAE redeems the SAME key by presenting the key_ID.
+
+  The key container is JSON, each entry carrying a UUID-style "key_ID" and a
+  base64-encoded "key" value, e.g.:
+
+     { "keys": [
+         { "key_ID": "bc490419-7d60-487f-adc1-4ddcc177c139",
+           "key":    "wHHVxRwDJs3/bXd38GHP3oe4svTuRpZS0yCC7x4Ly+s=" } ] }
+
+  Error semantics are plain HTTP and map directly to CN1 failure handling:
+     400 -> bad request format
+     401 -> unauthorized SAE
+     503 -> server-side error / key unavailable  (i.e., POOL EXHAUSTION)
+
+  CRITICAL POINT FOR THE POSTER: only the key_ID crosses the public network
+  between the two SAEs. The key itself is delivered locally by each KME. The
+  classical network transports a POINTER, not a secret.
+
+PHASE 8 — CONSUMPTION IN A SESSION PROTOCOL (the "post-QKD" hybrid step)
+  The delivered key is injected as ADDITIONAL ENTROPY into a conventional
+  handshake rather than used alone. In IKEv2, the IKE_SA_INIT establishes an
+  initial shared secret; CREATE_CHILD_SA exchanges create or rekey child SAs
+  and may perform additional key exchanges to add fresh entropy to session
+  keys; successive key exchanges are chained through a pseudorandom function
+  in a cascade, where PRF+ iterates the PRF to produce a keystream longer than
+  a single PRF output block so that the full IKEv2 "keymat"
+  { SK_d | SK_ai | SK_ar | SK_ei | SK_er | SK_pi | SK_pr } can be derived
+  [6]. Mixing additional secrets into IKEv2 for quantum resistance is
+  specified in RFC 8784, and support for multiple sequential key exchanges
+  (enabling classical + PQC + QKD-sourced material in one SA) is specified in
+  RFC 9370 [9], [10].
+
+  SECURITY PROPERTY OF THE HYBRID: the final session key depends on ALL
+  contributing secrets. Breaking elliptic-curve math alone, OR breaking the
+  lattice assumption alone, OR compromising the QKD hardware alone, is not
+  sufficient. An attacker must defeat every independent component.
+
+PHASE 9 — TRUSTED-NODE RELAY (when the two endpoints are too far apart)
+  If A and C have no direct quantum link but both reach node B:
+      B holds K_AB (with A) and K_BC (with C).
+      B computes and publishes  K_AB XOR K_AC_target  ... operationally:
+      B transmits  K_AB XOR K_BC  over the classical channel; C recovers the
+      key A intends to share by XOR-ing with its own K_BC.
+  The end-to-end key is therefore EXPOSED IN PLAINTEXT INSIDE NODE B.
+  B must be physically and operationally trusted. This is the single largest
+  architectural weakness of current QKD networks and the reason trusted-node-
+  free demonstrations are considered significant milestones [3].
+
+
+================================================================================
+7. NETWORK ARCHITECTURE / DESIGN DIAGRAM
+================================================================================
+
+NOTE: The ASCII layout below is the SPECIFICATION for your original diagram.
+Redraw it in draw.io / Figma / Visio for the poster. Do not paste ASCII onto
+the poster — the rubric awards 20 points for original technical visuals.
+
+                    *** HYBRID QKD + PQC SECURE NETWORK ARCHITECTURE ***
+                 (three planes: QUANTUM / KEY-MANAGEMENT / DATA)
+
+  SITE A (Campus Edge)                                   SITE B (Data Center)
+  =====================                                  ====================
+
+  +---------------------+                                +---------------------+
+  |  SAE-A              |                                |  SAE-B              |
+  |  (Security App      |                                |  (Security App      |
+  |   Entity: VPN GW,   |                                |   Entity: VPN GW,   |
+  |   TLS terminator,   |                                |   TLS terminator)   |
+  |   L2 encryptor)     |                                |                     |
+  +----------+----------+                                +----------+----------+
+             |  (1) HTTPS REST                                      |  (1) HTTPS REST
+             |  GET /api/v1/keys/{slave_SAE_ID}/status              |  POST .../dec_keys
+             |  GET .../enc_keys  -> {key_ID, key}                  |  {key_ID} -> key
+             v                                                      v
+  +---------------------+        KEY-MANAGEMENT PLANE    +---------------------+
+  |  KME-A              |<------ (3) authenticated ------>|  KME-B             |
+  |  Key Mgmt Entity    |        control / sync channel   |  Key Mgmt Entity   |
+  |  - key pool (queue) |        (classical, public,      |  - key pool (queue)|
+  |  - key_ID index     |         MUST be authenticated)  |  - key_ID index    |
+  |  - ETSI GS QKD 014  |                                 |  - ETSI GS QKD 014 |
+  |    REST server      |                                 |    REST server     |
+  +----------+----------+                                 +---------+----------+
+             ^                                                      ^
+             | (4) final key written to pool                        |
+  +----------+----------+                                 +---------+----------+
+  |  QKD MODULE A       |                                 |  QKD MODULE B      |
+  |  (Alice)            |                                 |  (Bob)             |
+  |  source + modulator |                                 |  detectors + basis |
+  |  RNG, basis choice  |                                 |  choice, timing    |
+  +----+-----------+----+                                 +----+----------+----+
+       |           |                                           |          |
+       |           |   === QUANTUM PLANE (Layer 1) ===          |          |
+       |           +===========================================+          |
+       |           |   (5) QUANTUM CHANNEL: dark fiber /                  |
+       |           |       dedicated DWDM lambda / free-space             |
+       |           |       weak optical pulses, NO amplifiers,            |
+       |           |       NO routers, NO regeneration                    |
+       |           |                                                      |
+       |           |   (6) CLASSICAL AUTHENTICATED CHANNEL                |
+       +-----------+======================================================+
+                   |       sifting / parameter estimation /
+                   |       reconciliation / privacy amplification
+                   |       (public content, authenticated integrity)
+                   |
+                   |
+   ---------------------------- DATA PLANE ----------------------------------
+                   |
+  +----------------v-----+      (7) ordinary IP network      +--------------+
+  |  Edge Router / FW A  |<--------------------------------->| Edge Router B|
+  +----------------------+   IPsec/IKEv2 tunnel OR TLS 1.3   +--------------+
+         ^                   session key =
+         |                   KDF( classical ECDHE
+         |                       || ML-KEM shared secret (PQC)
+         |                       || QKD key (via key_ID) )
+         |                   [RFC 8784 / RFC 9370 multiple KE]
+         |
+         +-- (8) PQC layer: ML-KEM key encapsulation, ML-DSA certificates
+                 (FIPS 203 / FIPS 204) -- works end-to-end over ANY IP path,
+                 including paths with NO quantum link.
+
+
+  ------------------------- REACH EXTENSION INSET -------------------------
+
+   A <==quantum==> [ TRUSTED NODE R ] <==quantum==> C
+                          |
+                          +--> holds K_AR and K_RC IN PLAINTEXT
+                          +--> relays K_AR XOR K_RC over classical channel
+                          +--> *** TRUST BOUNDARY — security assumption
+                               moves from mathematics to physical facility
+                               and personnel security ***
+
+   SATELLITE OPTION:         [ LEO SATELLITE ]
+                            /                 \
+                  free-space optical      free-space optical
+                          /                     \
+                   GROUND STATION A        GROUND STATION B
+                   (used to bridge intercontinental distances where fiber
+                    loss makes direct QKD impossible [12], [13])
+
+
+  LEGEND / WHERE THE EMERGING TECHNOLOGY OPERATES
+  -----------------------------------------------
+   (5)  QKD operates HERE — physical layer, quantum plane.
+   (3)(6) QKD CONTROL traffic — classical, authenticated, Layer 4/7.
+   (1)  KEY DELIVERY — ETSI GS QKD 014 REST API over HTTPS (Layer 7).
+   (7)(8) CONSUMPTION — key material injected into IKEv2/TLS key schedule,
+        protecting ordinary Layer 3 traffic.
+   >> Only key_IDs traverse the public network between sites. Key values are
+      delivered LOCALLY by each KME over a protected local interface.
+
+
+================================================================================
+8. PROTOCOL-LAYER CONNECTION (OSI / TCP-IP MAPPING)
+================================================================================
+
+OSI LAYER      | TCP/IP LAYER | ROLE OF QKD / POST-QKD COMPONENT
+---------------|--------------|-------------------------------------------------
+L7 Application | Application  | ETSI GS QKD 014 REST/JSON key delivery API
+               |              | between SAE and KME; HTTP methods and status
+               |              | codes (400/401/503) are the application-level
+               |              | contract [4]. ETSI GS QKD 004 defines the
+               |              | complementary application interface [5].
+               |              | Also: key consumption by TLS 1.3 / application
+               |              | KMS; PQC certificates (ML-DSA) [8].
+---------------|--------------|-------------------------------------------------
+L6/L5          | Application  | Session/presentation: TLS 1.3 handshake with
+ Presentation/ |              | hybrid key share (classical + ML-KEM); session
+ Session       |              | resumption and rekey scheduling driven by key
+               |              | pool availability.
+---------------|--------------|-------------------------------------------------
+L4 Transport   | Transport    | TCP carries the KME REST calls and the QKD
+               |              | post-processing messages reliably; reliability
+               |              | matters because reconciliation is interactive
+               |              | and order-sensitive.
+---------------|--------------|-------------------------------------------------
+L3 Network     | Internet     | PRIMARY CONSUMPTION POINT. IPsec SAs keyed with
+               |              | hybrid material; IKEv2 CREATE_CHILD_SA /
+               |              | IKE_FOLLOWUP_KE exchanges chain multiple key
+               |              | exchanges through PRF/PRF+ cascades to derive
+               |              | keymat [6], [9], [10]. Also where trust-aware
+               |              | path selection over trusted nodes is decided.
+---------------|--------------|-------------------------------------------------
+L2 Data Link   | Link         | Optical/Ethernet link encryptors (MACsec-style
+               |              | or OTN encryption) can draw AES keys directly
+               |              | from the KME, giving line-rate encryption with
+               |              | quantum-sourced rekeying.
+---------------|--------------|-------------------------------------------------
+L1 Physical    | Link         | THE QUANTUM CHANNEL ITSELF. Single-photon-level
+               |              | pulses over dark fiber, a dedicated DWDM
+               |              | wavelength, or free-space/satellite optics.
+               |              | Cannot be amplified, regenerated, or routed by
+               |              | conventional equipment.
+---------------|--------------|-------------------------------------------------
+"Layer 0"      | (new)        | Conceptual QUANTUM PLANE. Some literature and
+ (proposed)    |              | the ITU-T Y.3800-series framework treat the QKD
+               |              | network as a distinct layered network with its
+               |              | own quantum layer, key-management layer, and
+               |              | service layer [11].
+
+THE KEY INSIGHT TO PUT ON THE POSTER:
+QKD is generated at L1, orchestrated at L7, and consumed at L2/L3/L4.
+It therefore CROSSES the stack rather than occupying a single layer — which is
+exactly why integrating it is a networking problem and not only a physics one.
+
+
+================================================================================
+9. REAL-WORLD APPLICATION / EVIDENCE
+================================================================================
+
+A. METROPOLITAN AND NATIONAL TESTBEDS (documented in the reviewed literature)
+   - SwissQuantum (Geneva, Switzerland), launched 2008, spanning approximately
+     20 kilometres — one of the earliest sustained metropolitan QKD testbeds
+     [3].
+   - Tokyo QKD Network (Japan, from 2010) — a multi-node testbed on NICT's
+     JGN-X open fiber network, operated as a collaborative research platform
+     across universities and industry and notably involving MULTIPLE VENDORS,
+     which makes it an interoperability result and not just a physics result
+     [3], [16].
+   - United Kingdom (University of Bristol, 2020) — a network built with
+     specially developed OPEN-SOURCE software and operated as a TRUSTED-NODE-
+     FREE quantum network, directly addressing the trusted-relay weakness
+     identified in Section 11 [3].
+   - CSIRO Testbed (Australia, 2024) — a laboratory-based QKD research
+     environment focused on experimental validation, employing a
+     QuintessenceLabs QKD system [3].
+   - SECOQC (Vienna, 2008) — early multi-node, multi-technology QKD network
+     demonstrating a trusted-repeater network architecture [15].
+
+B. SATELLITE / LONG-HAUL
+   - Satellite-to-ground QKD demonstrated with the Micius satellite [12], and
+     a subsequently reported integrated space-to-ground quantum communication
+     network spanning thousands of kilometres combining fiber backbone and
+     satellite links [13]. This is the current answer to the distance limit.
+
+C. PROTOCOL / STANDARDS INTEGRATION (most relevant to CN1)
+   - ETSI GS QKD 014 V1.1.1 (Feb 2019) specifies the REST-based key delivery
+     API, including the Get status / Get key / Get key with key IDs methods,
+     the JSON key container format, and an informative annex on delivering
+     keys to MULTIPLE SAEs — i.e., a real, published networking interface,
+     not a concept [4].
+   - IETF RFC 8784 specifies mixing pre-shared keys into IKEv2 for post-
+     quantum security; RFC 9370 specifies multiple key exchanges in IKEv2 —
+     together these are the standardized hooks through which QKD-derived and
+     PQC-derived secrets enter a production IPsec tunnel [9], [10].
+   - Peer-reviewed integration work in IEEE JSAC (2025) demonstrates combining
+     classical cryptography, post-quantum cryptography, and QKD inside IKEv2,
+     including the CREATE_CHILD_SA / IKE_FOLLOWUP_KE cascade and PRF+ key
+     derivation described in Section 6 [6].
+   - ITU-T Y.3800-series recommendations define the overview and framework for
+     networks supporting QKD [11].
+
+D. CONCRETE DEPLOYMENT SCENARIO TO ILLUSTRATE ON THE POSTER
+   A university medical research center and its off-site data center, ~15 km
+   apart, connected by leased dark fiber. Patient genomic data must remain
+   confidential for decades — a textbook harvest-now/decrypt-later target.
+   Design: QKD modules at each end over a dedicated fiber pair; KMEs exposing
+   ETSI GS QKD 014; site VPN gateways acting as SAEs; IKEv2 child SAs rekeyed
+   every N seconds using hybrid keymat (ECDHE || ML-KEM || QKD key); automatic
+   fallback to PQC-only if the key pool returns HTTP 503. Result: the link is
+   protected even against an adversary who later breaks both ECC and the
+   lattice assumption, and it degrades gracefully instead of failing closed.
+
+
+================================================================================
+10. BENEFITS
+================================================================================
+
+B1. INFORMATION-THEORETIC KEY SECRECY (not computational).
+    Security of the key does not depend on any unproven hardness assumption.
+    Future increases in computing power — quantum or classical — do not
+    retroactively compromise keys already generated. WHY IT MATTERS: it is the
+    only approach that structurally defeats harvest-now/decrypt-later.
+
+B2. INTRUSION DETECTION BUILT INTO THE PHYSICAL LAYER.
+    Eavesdropping raises QBER. The network can therefore DETECT interception
+    attempts on the fiber as a measurable, continuous telemetry signal — a
+    capability classical optical links do not have. WHY IT MATTERS: it turns
+    tapping from an invisible risk into a monitored, alarmable event.
+
+B3. DEFENSE IN DEPTH THROUGH HYBRIDIZATION.
+    Because final keys derive from multiple independent secrets, the system
+    survives the failure of any single primitive [6], [9], [10]. WHY IT
+    MATTERS: it removes the need to bet correctly on which cryptosystem will
+    survive — a genuine engineering risk-management win.
+
+B4. CLEAN ARCHITECTURAL SEPARATION AND NON-DISRUPTIVE INTEGRATION.
+    A standardized REST key-delivery interface means applications request keys
+    without knowing anything about photons [4]. WHY IT MATTERS: vendor
+    independence, testability, and the ability to upgrade the quantum layer
+    without rewriting applications. The multi-vendor Tokyo testbed is evidence
+    this separation works in practice [3], [16].
+
+B5. LONG-LIVED CONFIDENTIALITY FOR HIGH-VALUE, FIXED-ROUTE LINKS.
+    Data-center interconnects, inter-branch financial links, national
+    infrastructure backhaul, and government circuits are point-to-point and
+    long-lived — exactly the topology QKD serves well. WHY IT MATTERS: the
+    technology is a poor universal solution but an excellent targeted one, and
+    recognizing that is the practical takeaway.
+
+B6. FRESH, HIGH-QUALITY SYMMETRIC KEY SUPPLY ENABLES AGGRESSIVE REKEYING.
+    A continuous key source makes frequent rekeying affordable, shrinking the
+    volume of data protected by any single key. WHY IT MATTERS: it limits
+    blast radius after any future key compromise.
+
+
+================================================================================
+11. LIMITATIONS / CHALLENGES
+================================================================================
+
+L1. DISTANCE AND SECRET-KEY RATE (physics-bound).
+    Photon loss in fiber is exponential in distance and quantum signals cannot
+    be amplified or regenerated (no-cloning). Secret-key rate therefore falls
+    sharply with distance, and there is a fundamental rate-distance bound for
+    repeaterless links; twin-field QKD was proposed specifically to improve the
+    scaling of that limit without quantum repeaters [14]. The reviewed testbed
+    survey shows typical research deployments operating over tens of
+    kilometres, with national/metro networks reaching a few hundred kilometres
+    only by chaining nodes [3].
+    >> CN1 FRAMING: this is a throughput-vs-distance constraint, and it forces
+       key material to be used for REKEYING rather than for one-time-pad.
+
+L2. THE TRUSTED-NODE PROBLEM (the hardest architectural issue).
+    Extending reach requires intermediate nodes that hold end-to-end key
+    material in plaintext. Every relay is a new trust anchor and a new attack
+    surface; the information-theoretic guarantee applies to each HOP, not to
+    the END-TO-END path. Trusted-node-free networks exist in research settings
+    [3], but true quantum repeaters are not deployable technology today.
+
+L3. AUTHENTICATION BOOTSTRAP DEPENDENCY.
+    QKD requires an authenticated classical channel and therefore cannot be
+    the sole root of trust. The reviewed literature classifies this challenge
+    as MEDIUM severity, resolvable in the SHORT TERM (1–3 years) via hybrid
+    QKD+PQC (e.g., lattice-based algorithms), with full reliance on quantum-
+    native authentication such as quantum digital signatures estimated at
+    5–10 years [3].
+
+L4. DEDICATED PHYSICAL INFRASTRUCTURE AND COST.
+    QKD generally needs dark fiber or a dedicated wavelength (Raman noise from
+    co-propagating classical channels degrades quantum signal quality),
+    specialized sources and single-photon detectors, and in some designs
+    cryogenic cooling. Capital and operating costs are high relative to a
+    software PQC upgrade, and they scale per-link, not per-user.
+
+L5. NO ROUTING, NO SWITCHING, NO MULTICAST IN THE QUANTUM PLANE.
+    Quantum states cannot be stored in a buffer, copied to multiple ports, or
+    forwarded by a conventional router. Every fundamental mechanism that makes
+    IP networks scalable is unavailable. QKD topologies are therefore point-
+    to-point or optically switched — fundamentally unlike the Internet.
+
+L6. IMPLEMENTATION / SIDE-CHANNEL ATTACKS.
+    Security proofs assume idealized devices. Real equipment has deviated from
+    the model, enabling attacks against detectors and sources; the field's
+    response includes measurement-device-independent protocols and extensive
+    analysis of practical device security [21]. The theory being
+    unconditionally secure does NOT make the product unconditionally secure.
+
+L7. AUTHORITATIVE SKEPTICISM FROM SECURITY AGENCIES.
+    The U.S. NSA has stated it does not support the use of QKD to protect
+    communications in National Security Systems and does not anticipate
+    certifying it, citing the need for special-purpose equipment, the trusted-
+    relay/insider risk, immature validation, and the lack of authentication
+    [18]. The UK NCSC has likewise advised that PQC, not QKD, is the primary
+    mitigation for the quantum threat in most settings [19].
+    >> THIS BELONGS ON THE POSTER. The critical-thinking rubric rewards
+       presenting evidence that cuts against the technology, not only for it.
+
+L8. KEY POOL EXHAUSTION AND AVAILABILITY.
+    If the key generation rate falls below demand — due to fiber degradation,
+    temperature, construction work, or simple over-subscription — the KME
+    returns an error (HTTP 503) and dependent tunnels lose their quantum key
+    source [4]. A deployment without a defined PQC fallback converts a
+    confidentiality technology into an AVAILABILITY risk.
+
+L9. INTEROPERABILITY AND STANDARDS IMMATURITY.
+    Although ETSI GS QKD 014/004 and ITU-T Y.3800 exist [4], [5], [11],
+    vendor implementations and physical-layer parameters still differ widely,
+    and multi-vendor operation remains a research achievement rather than a
+    routine procurement option [3], [16].
+
+L10. ENERGY AND OPERATIONAL OVERHEAD.
+    Detectors, stabilization, and (for some systems) cooling consume power
+    continuously, regardless of how much key is actually consumed — a poor
+    efficiency profile for lightly used links.
+
+
+================================================================================
+12. CURRENT STATUS — CLASSIFICATION AND JUSTIFICATION
+================================================================================
+
+OVERALL CLASSIFICATION: **EMERGING, WITH ACTIVE STANDARDIZATION, AND LIMITED
+NICHE DEPLOYMENT** — not mainstream deployed, and no longer purely research.
+
+A single label hides important structure, so classify PER COMPONENT:
+
+ COMPONENT                                   | STATUS           | EVIDENCE
+ --------------------------------------------|------------------|-----------
+ QKD physics / BB84 & E91 protocols          | MATURE /         | [1],[2],
+                                             | ESTABLISHED      | [17],[21]
+ --------------------------------------------|------------------|-----------
+ Point-to-point commercial QKD hardware      | DEPLOYED         | Vendor
+ over metro fiber                            | (niche, limited) | systems in
+                                             |                  | testbeds [3]
+ --------------------------------------------|------------------|-----------
+ Key delivery API (ETSI GS QKD 014/004)      | STANDARDIZATION  | Published
+                                             | (published spec) | [4],[5]
+ --------------------------------------------|------------------|-----------
+ QKD network framework (ITU-T Y.3800 series) | STANDARDIZATION  | [11]
+ --------------------------------------------|------------------|-----------
+ Hybrid QKD+PQC in IKEv2/IPsec               | EMERGING /       | RFC 8784,
+                                             | EARLY STANDARD + | RFC 9370,
+                                             | peer-reviewed    | [6],[9],[10]
+                                             | implementation   |
+ --------------------------------------------|------------------|-----------
+ PQC algorithms (ML-KEM / ML-DSA / SLH-DSA)  | STANDARDIZED     | FIPS 203,
+                                             | (Aug 2024) and   | 204, 205
+                                             | deploying fast   | [7],[8]
+ --------------------------------------------|------------------|-----------
+ Metropolitan / national QKD networks        | EXPERIMENTAL /   | Geneva '08,
+                                             | TESTBED          | Tokyo '10,
+                                             |                  | UK '20,
+                                             |                  | CSIRO '24 [3]
+ --------------------------------------------|------------------|-----------
+ Satellite QKD                               | EXPERIMENTAL,    | [12],[13]
+                                             | demonstrated at  |
+                                             | national scale   |
+ --------------------------------------------|------------------|-----------
+ Trusted-node-free / repeater-based QKD      | MOSTLY RESEARCH  | [3],[14]
+ --------------------------------------------|------------------|-----------
+ Quantum repeaters & quantum memory          | RESEARCH         | [3]
+ --------------------------------------------|------------------|-----------
+ Quantum digital signatures for auth         | RESEARCH;        | [3]
+                                             | 5–10 yr horizon  |
+
+JUSTIFICATION NARRATIVE:
+The technology clears the "experimental only" bar because (i) a published,
+implementable network API exists and is being used across vendors [4], (ii)
+national testbeds have operated for over a decade with documented maturity
+levels ranging from low to high [3], and (iii) peer-reviewed work now
+demonstrates integration into a production-grade protocol (IKEv2) rather than
+into a laboratory one-off [6]. It does NOT clear the "deployed" bar because
+reach still depends on trusted relays, cost confines it to high-value links,
+multi-vendor interoperability is not routine, and influential national security
+authorities currently recommend PQC over QKD for general use [18], [19].
+
+MOST ACCURATE ONE-LINE CLASSIFICATION FOR THE POSTER:
+"QKD is an EMERGING technology in active STANDARDIZATION with niche
+ DEPLOYMENT; PQC is STANDARDIZED and deploying now; the HYBRID of the two is
+ where current networking research and early engineering effort is
+ concentrated."
+
+
+================================================================================
+13. FUTURE IMPACT (5–15 YEARS)
+================================================================================
+
+NEAR TERM (1–3 YEARS) — PQC becomes the default; QKD becomes a premium option.
+  Hybrid key exchange (classical + ML-KEM) becomes standard in TLS 1.3 and
+  IKEv2 deployments. QKD appears as an optional additional entropy source on
+  selected high-value links. The reviewed literature places hybrid QKD+PQC
+  authentication solutions squarely in this 1–3 year window, and rates key
+  extraction efficiency as essentially solved within 1–2 years by modern
+  low-leakage reconciliation codes [3].
+
+MID TERM (3–7 YEARS) — the key becomes a managed network resource.
+  Expect "Key-as-a-Service" / QKD-as-a-Service offerings in which carriers
+  expose ETSI-compliant key APIs to tenants. Key pools will be monitored,
+  budgeted, and SLA'd exactly like bandwidth, with telemetry for key rate,
+  QBER, and pool depth feeding standard NOC dashboards. Crypto-agility —
+  the ability to switch key sources at runtime without re-architecting —
+  becomes a procurement requirement. QBER monitoring may be marketed as a
+  physical-layer intrusion detection feature in its own right.
+
+LONGER TERM (7–15 YEARS) — conditional on quantum repeaters.
+  IF entanglement swapping with practical quantum memory matures, the trusted-
+  node requirement disappears and genuine END-TO-END information-theoretic
+  keys over long distances become possible. That would change the trust model
+  of the Internet more than any change since the introduction of public-key
+  cryptography. Combined with satellite links already demonstrated at
+  continental scale [13], the plausible outcome is a hybrid global fabric:
+  PQC everywhere by default, QKD on backbone and high-assurance segments,
+  satellites bridging continents, with routing decisions that account for
+  trust boundaries as well as cost and latency. Realistically, repeaters
+  remain the gating uncertainty; if they do not mature, QKD stays a valuable
+  but bounded point-to-point technology rather than a networking paradigm.
+
+WHAT STUDENTS/ENGINEERS SHOULD TAKE AWAY ABOUT CAREER-RELEVANT CHANGE:
+  Network engineers will increasingly manage CRYPTOGRAPHIC INVENTORY the way
+  they manage IP address space today: knowing which algorithm protects which
+  flow, how long its material lives, and how to rotate it under pressure.
+
+
+================================================================================
+14. CONCLUSION
+================================================================================
+
+MOST IMPORTANT FINDING:
+The decisive problem in quantum-era networking is not generating quantum keys —
+that physics has been demonstrated repeatedly since 1984 and runs in
+metropolitan testbeds today. The decisive problem is DELIVERING and CONSUMING
+those keys inside real protocol stacks under real constraints of distance,
+rate, trust, and availability. Standardized interfaces such as the ETSI
+REST-based key delivery API and standardized IKEv2 extensions for multiple key
+exchanges are what actually convert QKD from a laboratory result into a
+network service.
+
+SECOND, EQUALLY IMPORTANT FINDING:
+QKD does not eliminate trust; it RELOCATES it — from mathematical assumptions
+to physical devices, fiber plant, and trusted relay facilities. Any honest
+assessment must say so, which is why national security agencies currently
+favor PQC for general use while research continues on trusted-node-free
+architectures.
+
+THE PRACTICAL TAKEAWAY:
+The realistic architecture of the next decade is HYBRID and defense-in-depth:
+PQC everywhere for reach and authentication, QKD where physics and budget
+permit, and a key schedule that combines both so that no single broken
+assumption compromises the session. For a CN1 student, the enduring lesson is
+that a security technology succeeds or fails on ordinary networking
+properties — latency, throughput, queuing, topology, availability, and
+interoperability — not on the elegance of its underlying theory.
+
+
+================================================================================
+15. IEEE REFERENCES
+================================================================================
+
+[1]  C. H. Bennett and G. Brassard, "Quantum cryptography: Public key
+     distribution and coin tossing," in Proc. IEEE Int. Conf. Comput., Syst.
+     Signal Process., Bangalore, India, Dec. 1984, pp. 175–179.
+
+[2]  A. K. Ekert, "Quantum cryptography based on Bell's theorem," Phys. Rev.
+     Lett., vol. 67, no. 6, pp. 661–663, Aug. 1991.
+
+[3]  S. Kish, J. Pieprzyk, and S. Camtepe, "Quantum key distribution,"
+     <<FILL: book/report title, publisher, place, year, pp.>> (provided course
+     reading; see Table 1.2, "Maturity Levels and Vendors of QKD Activities
+     and Testbeds Worldwide").
+
+[4]  Quantum Key Distribution (QKD); Protocol and Data Format of REST-Based Key
+     Delivery API, ETSI GS QKD 014 V1.1.1, European Telecommunications
+     Standards Institute, Sophia Antipolis, France, Feb. 2019.
+
+[5]  Quantum Key Distribution (QKD); Application Interface, ETSI GS QKD 004,
+     European Telecommunications Standards Institute, Sophia Antipolis,
+     France. <<FILL: version and year you cite>>
+
+[6]  <<FILL: author list>>, "Enhanced network security protocols for the
+     quantum era: Combining classical and post-quantum cryptography and
+     quantum key distribution," IEEE J. Sel. Areas Commun., vol. 43, no. 8,
+     pp. <<FILL start–end; article text appears at p. 2774>>, 2025.
+
+[7]  Module-Lattice-Based Key-Encapsulation Mechanism Standard, FIPS PUB 203,
+     National Institute of Standards and Technology, Gaithersburg, MD, USA,
+     Aug. 2024.
+
+[8]  Module-Lattice-Based Digital Signature Standard, FIPS PUB 204, National
+     Institute of Standards and Technology, Gaithersburg, MD, USA, Aug. 2024.
+
+[9]  C. Tjhai, M. Tomlinson, G. Bartlett, S. Fluhrer, D. Van Geest,
+     O. Garcia-Morchon, and V. Smyslov, "Mixing preshared keys in the Internet
+     Key Exchange Protocol Version 2 (IKEv2) for post-quantum security,"
+     IETF RFC 8784, Jun. 2020.
+
+[10] C. Tjhai, M. Tomlinson, G. Bartlett, S. Fluhrer, D. Van Geest,
+     O. Garcia-Morchon, and V. Smyslov, "Multiple key exchanges in the
+     Internet Key Exchange Protocol Version 2 (IKEv2)," IETF RFC 9370,
+     May 2023.
+
+[11] Overview on Networks Supporting Quantum Key Distribution,
+     ITU-T Recommendation Y.3800, International Telecommunication Union,
+     Geneva, Switzerland, Oct. 2019.
+
+[12] S.-K. Liao et al., "Satellite-to-ground quantum key distribution,"
+     Nature, vol. 549, no. 7670, pp. 43–47, Sep. 2017.
+
+[13] Y.-A. Chen et al., "An integrated space-to-ground quantum communication
+     network over 4,600 kilometres," Nature, vol. 589, no. 7841, pp. 214–219,
+     Jan. 2021.
+
+[14] M. Lucamarini, Z. L. Yuan, J. F. Dynes, and A. J. Shields, "Overcoming
+     the rate–distance limit of quantum key distribution without quantum
+     repeaters," Nature, vol. 557, no. 7705, pp. 400–403, May 2018.
+
+[15] M. Peev et al., "The SECOQC quantum key distribution network in Vienna,"
+     New J. Phys., vol. 11, no. 7, art. no. 075001, Jul. 2009.
+
+[16] M. Sasaki et al., "Field test of quantum key distribution in the Tokyo QKD
+     Network," Opt. Express, vol. 19, no. 11, pp. 10387–10409, May 2011.
+
+[17] V. Scarani, H. Bechmann-Pasquinucci, N. J. Cerf, M. Dušek, N. Lütkenhaus,
+     and M. Peev, "The security of practical quantum key distribution,"
+     Rev. Mod. Phys., vol. 81, no. 3, pp. 1301–1350, Sep. 2009.
+
+[18] National Security Agency, "Quantum key distribution (QKD) and quantum
+     cryptography (QC)," NSA Cybersecurity Guidance. <<FILL: accessed date and
+     URL — verify current wording before citing>>
+
+[19] National Cyber Security Centre, "Quantum security technologies," NCSC
+     White Paper, United Kingdom, 2020. <<FILL: accessed date and URL>>
+
+[20] F. Xu, X. Ma, Q. Zhang, H.-K. Lo, and J.-W. Pan, "Secure quantum key
+     distribution with realistic devices," Rev. Mod. Phys., vol. 92, no. 2,
+     art. no. 025002, May 2020.
+
+[21] <<Use [20] where the text cites [21]; renumber consecutively after you
+     finalize which references you keep. See the .log file, Section L7.>>
+
+[22] N. Prakash, Quantum Computing. Hoboken, NJ, USA: Wiley, 2026. (Provided
+     course reading; background on qubits, NISQ limitations, and quantum error
+     correction.)
+
+
+================================================================================
+APPENDIX A — SUGGESTED POSTER ABSTRACT (for the required .docx)
+================================================================================
+Word count: ~215. Adjust to your instructor's limit.
+
+Modern network security depends on key-exchange mechanisms whose secrecy rests
+on computational hardness assumptions that quantum computing is expected to
+invalidate, creating an immediate "harvest-now, decrypt-later" risk for traffic
+with long confidentiality lifetimes. This project examines Quantum Key
+Distribution (QKD) and its integration with Post-Quantum Cryptography (PQC) as
+a networking problem rather than a physics problem. QKD derives symmetric keys
+from measurement statistics on a quantum channel, so eavesdropping produces a
+measurable quantum bit error rate rather than silent compromise. However, QKD
+requires a separate authenticated classical channel, cannot be routed,
+amplified, or multicast, and extends its reach only through trusted relay
+nodes that hold key material in plaintext. The work maps QKD across the
+protocol stack: generation at Layer 1, orchestration through the ETSI
+GS QKD 014 REST key-delivery API at Layer 7, and consumption at Layers 2–4,
+where IKEv2 multiple key-exchange extensions (RFC 8784, RFC 9370) allow
+classical, post-quantum, and quantum-derived secrets to be cascaded into a
+single session key. CN1 concepts of throughput, queuing, delay, error control,
+and availability are applied to key-rate limits and key-pool exhaustion.
+Evidence from metropolitan and national testbeds supports classifying QKD as
+emerging with active standardization, while the practical near-term
+architecture is hybrid: PQC for reach and authentication, QKD for high-value
+links, and defense in depth across both.
+
+
+================================================================================
+APPENDIX B — POSTER LAYOUT SUGGESTION (visual hierarchy)
+================================================================================
+COLUMN 1 : Title block + identification | Problem/Motivation | Background
+COLUMN 2 : CN1 Concept Connections (table) | How It Works (numbered flow)
+COLUMN 3 : *** LARGE ORIGINAL ARCHITECTURE DIAGRAM *** (anchor visual,
+           occupies ~1/3 of poster area) | Protocol-Layer mapping table
+COLUMN 4 : Real-World Evidence | Benefits vs. Limitations (side-by-side) |
+           Status table | Future Impact timeline | Conclusion
+FOOTER   : IEEE references (small type) | GitHub QR | YouTube QR | #WGP
+
+DESIGN NOTES
+- Use ONE accent color for the quantum plane and ONE for the classical plane,
+  and keep that mapping consistent in every figure.
+- Make Benefits and Limitations physically adjacent — the rubric rewards
+  balanced analysis and reviewers notice visual balance.
+- The status table is the fastest way to demonstrate the required
+  "distinguish deployed vs. emerging vs. speculative" critical-thinking
+  standard.
+
+================================================================================
+END OF DOCUMENT
+================================================================================
