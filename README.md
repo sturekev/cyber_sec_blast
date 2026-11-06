@@ -14,12 +14,6 @@ latency, and availability.
 **Track:** Emerging Networking Technology / Network Security  
 **Course section, semester, sponsor, and institution:** To be completed
 
-## Project links
-
-- **GitHub repository:** To be added
-- **LinkedIn post:** To be added
-- **YouTube post/video:** To be added
-
 ## Project overview
 
 Conventional secure sessions use public-key key-exchange mechanisms whose
@@ -42,6 +36,13 @@ The proposed near-term direction is a hybrid architecture:
 
 QKD generates key material; it is not an encryption algorithm or a replacement
 for IP networking. Symmetric cryptography such as AES still protects bulk data.
+## Project information
+
+- **Author:** Truong Phat Tu
+- **Faculty sponsor:** Dr. Visvasuresh (Victor) Govindaswamy
+- **Institution:** Concordia University Chicago
+- **Course:** Software Engineering (BLA 02)
+- **Semester:** Fall 2026
 
 ## How the architecture works
 
